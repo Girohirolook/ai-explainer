@@ -1,10 +1,11 @@
+import { marked } from 'marked';
+
 let lastMouseX = 0;
 let lastMouseY = 0;
 let popupElement: HTMLDivElement | null = null;
 
-// Переменные для замедления текста
-let currentStreamText = ""; // То, что уже на экране
-let pendingText = "";       // То, что прислал ИИ, но мы еще не вывели
+let currentStreamText = ""; 
+let pendingText = "";       
 let typewriterInterval: number | null = null;
 
 document.addEventListener('contextmenu', (event) => {
@@ -20,46 +21,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.type === "SHOW_LOADING") {
         resetTypewriter();
-        createOrUpdatePopup("Думаю... 🤖");
+        createOrUpdatePopup("<i>Думаю... 🤖</i>");
     }
 
     if (request.type === "START_STREAM") {
         resetTypewriter();
         createOrUpdatePopup(""); 
-        startTypewriter(); // Запускаем эффект печати
+        startTypewriter();
     }
 
     if (request.type === "CHUNK_STREAM") {
-        // ИСПРАВЛЕНИЕ №2: Не выводим текст сразу, а добавляем в "очередь"
         pendingText += request.text;
     }
 
     if (request.type === "SHOW_RESULT") {
         resetTypewriter();
-        const formattedText = request.text.replace(/\n/g, '<br>');
-        createOrUpdatePopup(formattedText);
+        // Используем синхронный парсинг для финального результата
+        const html = marked.parse(request.text) as string;
+        createOrUpdatePopup(html);
     }
 });
 
-// --- ЛОГИКА ЭФФЕКТА ПЕЧАТНОЙ МАШИНКИ ---
 function startTypewriter() {
     if (typewriterInterval) clearInterval(typewriterInterval);
     
-    // Каждые 15 миллисекунд берем по одной букве из очереди (можете изменить скорость)
     typewriterInterval = window.setInterval(() => {
         if (pendingText.length > 0) {
-            // Берем первую букву из очереди и убираем ее оттуда
             const char = pendingText.charAt(0);
             pendingText = pendingText.substring(1);
-            
-            // Добавляем на экран
             currentStreamText += char;
             
-            // ИСПРАВЛЕНИЕ №3: Скролл убран, окно просто обновляет текст
-            const formattedText = currentStreamText.replace(/\n/g, '<br>');
-            createOrUpdatePopup(formattedText);
+            // Парсим Markdown "на лету"
+            // marked.parseSync — самый быстрый способ для стриминга
+            const htmlContent = marked.parse(currentStreamText, { async: false }) as string;
+            createOrUpdatePopup(htmlContent);
         }
-    }, 5); // Чем больше число, тем медленнее печатает (15-20 обычно идеально)
+    }, 5); 
 }
 
 function resetTypewriter() {
@@ -70,7 +67,6 @@ function resetTypewriter() {
     currentStreamText = "";
     pendingText = "";
 }
-// ----------------------------------------
 
 function createOrUpdatePopup(htmlContent: string) {
     if (!popupElement) {
@@ -105,5 +101,5 @@ function removePopup() {
         popupElement.remove();
         popupElement = null;
     }
-    resetTypewriter(); // Останавливаем печать, если закрыли окно
+    resetTypewriter();
 }

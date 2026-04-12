@@ -19,6 +19,7 @@
     "webpack-cli": "^7.0.2"
   },
   "dependencies": {
-    "@google/genai": "^1.49.0"
+    "@google/genai": "^1.49.0",
+    "marked": "^18.0.0"
   }
 }

@@ -26,13 +26,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             // Теперь собираем контекст
             const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_CONTEXT" });
             const pageContext = response?.context || "";
-            const truncatedContext = pageContext.substring(0, 15000);
+            const truncatedContext = pageContext.substring(0, 50000);
 
             const ai = new GoogleGenAI({ apiKey: apiKey });
             // const prompt = `Контекст:\n"${truncatedContext}"\n\nОбъясни:\n"${selectedText}"`;
 
             const prompt = `Контекст:\n"${truncatedContext}"\n\nОбъясни смысл выделенного текста. 
-            ВАЖНО: Пиши максимально кратко. Твой ответ должен быть не длиннее 250-300 токенов. 
+            ВАЖНО: Твой ответ должен быть не длиннее 300-400 токенов. 
             Текст для объяснения:\n"${selectedText}"`;
 
             const stream = await ai.models.generateContentStream({
