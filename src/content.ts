@@ -2,46 +2,81 @@ let lastMouseX = 0;
 let lastMouseY = 0;
 let popupElement: HTMLDivElement | null = null;
 
-// Запоминаем координаты мыши при правом клике, чтобы знать, где открыть окно
+// Переменные для замедления текста
+let currentStreamText = ""; // То, что уже на экране
+let pendingText = "";       // То, что прислал ИИ, но мы еще не вывели
+let typewriterInterval: number | null = null;
+
 document.addEventListener('contextmenu', (event) => {
     lastMouseX = event.pageX;
     lastMouseY = event.pageY;
 });
 
-// Закрытие окна при клике вне его области
-// document.addEventListener('mousedown', (event) => {
-//     if (popupElement && !popupElement.contains(event.target as Node)) {
-//         removePopup();
-//     }
-// });
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === "GET_CONTEXT") {
-        // Отправляем текст всей страницы для контекста
         sendResponse({ context: document.body.innerText });
         return true; 
     }
 
     if (request.type === "SHOW_LOADING") {
+        resetTypewriter();
         createOrUpdatePopup("Думаю... 🤖");
     }
 
+    if (request.type === "START_STREAM") {
+        resetTypewriter();
+        createOrUpdatePopup(""); 
+        startTypewriter(); // Запускаем эффект печати
+    }
+
+    if (request.type === "CHUNK_STREAM") {
+        // ИСПРАВЛЕНИЕ №2: Не выводим текст сразу, а добавляем в "очередь"
+        pendingText += request.text;
+    }
+
     if (request.type === "SHOW_RESULT") {
-        // Форматируем текст (заменяем переносы строк на <br> для читаемости)
+        resetTypewriter();
         const formattedText = request.text.replace(/\n/g, '<br>');
         createOrUpdatePopup(formattedText);
     }
 });
+
+// --- ЛОГИКА ЭФФЕКТА ПЕЧАТНОЙ МАШИНКИ ---
+function startTypewriter() {
+    if (typewriterInterval) clearInterval(typewriterInterval);
+    
+    // Каждые 15 миллисекунд берем по одной букве из очереди (можете изменить скорость)
+    typewriterInterval = window.setInterval(() => {
+        if (pendingText.length > 0) {
+            // Берем первую букву из очереди и убираем ее оттуда
+            const char = pendingText.charAt(0);
+            pendingText = pendingText.substring(1);
+            
+            // Добавляем на экран
+            currentStreamText += char;
+            
+            // ИСПРАВЛЕНИЕ №3: Скролл убран, окно просто обновляет текст
+            const formattedText = currentStreamText.replace(/\n/g, '<br>');
+            createOrUpdatePopup(formattedText);
+        }
+    }, 5); // Чем больше число, тем медленнее печатает (15-20 обычно идеально)
+}
+
+function resetTypewriter() {
+    if (typewriterInterval) {
+        clearInterval(typewriterInterval);
+        typewriterInterval = null;
+    }
+    currentStreamText = "";
+    pendingText = "";
+}
+// ----------------------------------------
 
 function createOrUpdatePopup(htmlContent: string) {
     if (!popupElement) {
         popupElement = document.createElement('div');
         popupElement.className = 'gemini-explainer-popup';
         
-        // Позиционируем окно рядом с мышью
-        popupElement.style.left = `${lastMouseX}px`;
-        popupElement.style.top = `${lastMouseY + 15}px`;
-
         const closeBtn = document.createElement('div');
         closeBtn.className = 'gemini-explainer-close';
         closeBtn.innerHTML = '✖';
@@ -54,6 +89,9 @@ function createOrUpdatePopup(htmlContent: string) {
         popupElement.appendChild(closeBtn);
         popupElement.appendChild(contentDiv);
         document.body.appendChild(popupElement);
+        
+        popupElement.style.left = `${lastMouseX}px`;
+        popupElement.style.top = `${lastMouseY + 15}px`;
     } else {
         const contentDiv = popupElement.querySelector('.gemini-explainer-content');
         if (contentDiv) {
@@ -67,4 +105,5 @@ function removePopup() {
         popupElement.remove();
         popupElement = null;
     }
+    resetTypewriter(); // Останавливаем печать, если закрыли окно
 }
