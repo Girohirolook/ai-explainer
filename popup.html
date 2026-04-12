@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: sans-serif; width: 250px; padding: 10px; }
+    input { width: 100%; padding: 5px; margin-bottom: 10px; box-sizing: border-box; }
+    button { width: 100%; padding: 8px; background: #4285f4; color: white; border: none; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #3367d6; }
+    #status { margin-top: 10px; font-size: 12px; color: green; display: none; }
+  </style>
+</head>
+<body>
+  <h3>Настройки Gemini</h3>
+  <label for="apiKey">Gemini API Key:</label>
+  <input type="password" id="apiKey" placeholder="Введите ваш API ключ">
+  <button id="saveBtn">Сохранить</button>
+  <div id="status">Сохранено!</div>
+  <script src="dist/popup.js"></script>
+</body>
+</html>

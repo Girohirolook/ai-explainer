@@ -1,0 +1,38 @@
+# Зависимости
+node_modules/
+
+# Скомпилированный код
+dist/
+build/
+
+# JavaScript файлы (скомпилированные из TS)
+*.js
+!webpack.config.js
+!*.config.js
+
+# Source maps
+*.js.map
+*.ts.map
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+npm-debug.log*
+
+# Временные файлы
+*.tmp
+*.temp

@@ -1,0 +1,24 @@
+{
+  "name": "ai_explainer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack",
+    "watch": "webpack --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/chrome": "^0.1.40",
+    "ts-loader": "^9.5.7",
+    "typescript": "^6.0.2",
+    "webpack": "^5.106.1",
+    "webpack-cli": "^7.0.2"
+  },
+  "dependencies": {
+    "@google/genai": "^1.49.0"
+  }
+}

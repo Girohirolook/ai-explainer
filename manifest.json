@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Explainer",
+  "version": "1.0",
+  "description": "Объясняет выделенный текст с учетом контекста страницы с помощью Gemini API",
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"],
+      "css": ["src/content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
