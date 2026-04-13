@@ -4,13 +4,34 @@ let lastMouseX = 0;
 let lastMouseY = 0;
 let popupElement: HTMLDivElement | null = null;
 
+let isDragging = false;
+let offsetX = 0;
+let offsetY = 0;
+
 let currentStreamText = ""; 
 let pendingText = "";       
 let typewriterInterval: number | null = null;
 
+// Запоминаем координаты относительно ЭКРАНА (clientX/Y)
 document.addEventListener('contextmenu', (event) => {
-    lastMouseX = event.pageX;
-    lastMouseY = event.pageY;
+    lastMouseX = event.clientX;
+    lastMouseY = event.clientY;
+});
+
+// Логика перемещения для FIXED позиционирования
+document.addEventListener('mousemove', (e) => {
+    if (isDragging && popupElement) {
+        // Для position: fixed координаты вычисляются просто по clientX/Y
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+        
+        popupElement.style.left = `${x}px`;
+        popupElement.style.top = `${y}px`;
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    isDragging = false;
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -36,7 +57,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.type === "SHOW_RESULT") {
         resetTypewriter();
-        // Используем синхронный парсинг для финального результата
         const html = marked.parse(request.text) as string;
         createOrUpdatePopup(html);
     }
@@ -44,15 +64,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function startTypewriter() {
     if (typewriterInterval) clearInterval(typewriterInterval);
-    
     typewriterInterval = window.setInterval(() => {
         if (pendingText.length > 0) {
             const char = pendingText.charAt(0);
             pendingText = pendingText.substring(1);
             currentStreamText += char;
-            
-            // Парсим Markdown "на лету"
-            // marked.parseSync — самый быстрый способ для стриминга
             const htmlContent = marked.parse(currentStreamText, { async: false }) as string;
             createOrUpdatePopup(htmlContent);
         }
@@ -73,21 +89,41 @@ function createOrUpdatePopup(htmlContent: string) {
         popupElement = document.createElement('div');
         popupElement.className = 'gemini-explainer-popup';
         
+        // Начальная позиция относительно вьюпорта
+        popupElement.style.left = `${lastMouseX}px`;
+        popupElement.style.top = `${lastMouseY + 15}px`;
+
+        const header = document.createElement('div');
+        header.className = 'gemini-explainer-header';
+        
+        const title = document.createElement('span');
+        title.innerText = 'Gemini Explainer';
+        
         const closeBtn = document.createElement('div');
         closeBtn.className = 'gemini-explainer-close';
         closeBtn.innerHTML = '✖';
         closeBtn.onclick = removePopup;
 
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        
+        header.addEventListener('mousedown', (e) => {
+            if (popupElement) {
+                isDragging = true;
+                const rect = popupElement.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                e.preventDefault();
+            }
+        });
+
         const contentDiv = document.createElement('div');
         contentDiv.className = 'gemini-explainer-content';
         contentDiv.innerHTML = htmlContent;
 
-        popupElement.appendChild(closeBtn);
+        popupElement.appendChild(header);
         popupElement.appendChild(contentDiv);
         document.body.appendChild(popupElement);
-        
-        popupElement.style.left = `${lastMouseX}px`;
-        popupElement.style.top = `${lastMouseY + 15}px`;
     } else {
         const contentDiv = popupElement.querySelector('.gemini-explainer-content');
         if (contentDiv) {

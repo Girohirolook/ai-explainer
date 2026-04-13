@@ -26,7 +26,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             // Теперь собираем контекст
             const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_CONTEXT" });
             const pageContext = response?.context || "";
-            const truncatedContext = pageContext.substring(0, 50000);
+            const truncatedContext = pageContext.substring(0, 20000);
 
             const ai = new GoogleGenAI({ apiKey: apiKey });
             // const prompt = `Контекст:\n"${truncatedContext}"\n\nОбъясни:\n"${selectedText}"`;
