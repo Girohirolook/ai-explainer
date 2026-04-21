@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@google/genai": "^1.49.0",
+    "ai": "^6.0.168",
+    "ai-sdk-genapi": "^0.3.5",
     "marked": "^18.0.0"
   }
 }

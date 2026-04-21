@@ -1,60 +1,113 @@
-import { GoogleGenAI } from '@google/genai';
-
+// import { GoogleGenAI } from '@google/genai';
+import { createGenApi } from 'ai-sdk-genapi';
+import { generateText } from "ai"
+ 
 chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.create({ id: "explain-text", title: "Explain (Gemini)", contexts: ["selection"] });
 });
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (info.menuItemId === "explain-text" && tab?.id) {
-        const selectedText = info.selectionText || "";
-
+chrome.runtime.onMessage.addListener(async (message, sender) => {
+    if ((message.type === "START_NEW_CHAT" || message.type === "CONTINUE_CHAT") && sender.tab?.id) {
+        const tabId = sender.tab.id;
         try {
-            // 1. Показываем загрузку
-            await chrome.tabs.sendMessage(tab.id, { type: "SHOW_LOADING" });
-
-            // ИСПРАВЛЕНИЕ №1: Даем браузеру 50мс, чтобы он успел нарисовать окно "Думаю..."
-            await new Promise(resolve => setTimeout(resolve, 20));
-
             const storage = await chrome.storage.local.get(['geminiApiKey']);
             const apiKey = storage.geminiApiKey;
+            if (!apiKey || typeof apiKey != "string") return;
 
-            if (!apiKey || typeof apiKey != "string") {
-                await chrome.tabs.sendMessage(tab.id, { type: "SHOW_RESULT", text: "Ошибка: Введите ключ." });
-                return;
+            let text = "";
+            if (message.history) {
+                for (const s of message.history) {
+                    text += s;
+                }
             }
+            console.log(text);
 
-            // Теперь собираем контекст
-            const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_CONTEXT" });
-            const pageContext = response?.context || "";
-            const truncatedContext = pageContext.substring(0, 20000);
+            // Воссоздаем сессию чата с переданной историей
+            console.log("start-chat")
+            console.log(message.history || [])
+            console.log("send_message")
 
-            const ai = new GoogleGenAI({ apiKey: apiKey });
-            // const prompt = `Контекст:\n"${truncatedContext}"\n\nОбъясни:\n"${selectedText}"`;
-
-            const prompt = `Контекст:\n"${truncatedContext}"\n\nОбъясни смысл выделенного текста. 
-            ВАЖНО: Твой ответ должен быть не длиннее 300-400 токенов. 
-            Текст для объяснения:\n"${selectedText}"`;
-
-            const stream = await ai.models.generateContentStream({
-                model: 'gemini-3.1-flash-lite-preview',
-                contents: prompt,
+            const response = await fetch("https://api.gen-api.ru/api/v1/networks/gemini-2-5-flash-lite", {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + apiKey,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    messages: [
+                    {
+                        role: "user",
+                        content: message.text,
+                    }
+                    ],
+                    stream: true
+                })
             });
-
-            await chrome.tabs.sendMessage(tab.id, { type: "START_STREAM" });
-            
-            for await (const chunk of stream) {
-                if (chunk.text) {
-                    await chrome.tabs.sendMessage(tab.id, { type: "CHUNK_STREAM", text: chunk.text });
+            if (response.body) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    let text = getTextFromResponse(decoder.decode(value));
+                    chrome.tabs.sendMessage(tabId, { type: "CHUNK_STREAM", text: text.text, cost: text.cost });
                 }
             }
 
+
+            // Отправляем сообщение (либо промпт с контекстом, либо просто вопрос)
+            // console.log(message.text)
+            // const result = await chat.sendMessageStream({"message": message.text});
+            
+            // console.log("start")
+            // for await (const chunk of result) {
+            //     const chunkText = chunk.text;
+            //     console.log(chunkText)
+            //     if (chunkText) {
+            //         chrome.tabs.sendMessage(tabId, { type: "CHUNK_STREAM", text: chunkText });
+            //     }
+            // }
         } catch (error: any) {
-            console.error("Ошибка:", error);
-            if (error.message && error.message.includes("Receiving end does not exist")) {
-                console.warn("Обновите страницу (F5).");
-            } else {
-                chrome.tabs.sendMessage(tab.id, { type: "SHOW_RESULT", text: `Ошибка: ${error.message}` }).catch(()=>{});
+            chrome.tabs.sendMessage(tabId, { type: "SHOW_RESULT", text: "Ошибка: " + error.message });
+        }
+    }
+});
+
+
+function getTextFromResponse(response: any): { text: string; cost: number } {
+    const lines = response.split('\n');
+    let result = '';
+    let totalCost = 0;
+
+    for (const line of lines) {
+        if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6);
+            if (jsonStr !== '[DONE]') {
+                try {
+                    const obj = JSON.parse(jsonStr);
+                    const content = obj.choices?.[0]?.delta?.content;
+                    if (content) result += content;
+                    const cost = obj.usage?.cost;
+                    if (typeof cost === 'number') totalCost += cost;
+                } catch (e) {
+                    // ignore parse errors
+                }
             }
         }
+    }
+    
+    totalCost = Math.round(totalCost * 10000) / 10000;
+
+    return { text: result, cost: totalCost };
+}
+
+
+// Слушатель контекстного меню теперь просто дает команду контент-скрипту начать чат
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === "explain-text" && tab?.id) {
+        chrome.tabs.sendMessage(tab.id, { 
+            type: "INIT_EXPLAIN", 
+            selection: info.selectionText 
+        });
     }
 });
