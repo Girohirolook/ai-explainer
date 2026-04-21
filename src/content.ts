@@ -48,10 +48,10 @@ async function startInitialExplain(selection: string) {
     const contextEnd = Math.min(fullText.length, selectionEnd + dist);
     const context = fullText.substring(contextStart, contextEnd);
 
-    const initialPrompt = `Контекст страницы:\n"${context}"\n\nОбъясни выделенный текст:\n"${selection}"\nВажно: все твои ответы должны быть не длинее 500 символов, но информативными.`;
+    const initialPrompt = `Контекст страницы:\n"${context}"\n\nОбъясни выделенный текст:\n"${selection}"\nВажно: все твои ответы должны быть от 200 до 500 символов, но информативными. Используй markdown-разметку.`;
 
     // Сброс всего
-    chatHistory = [];
+    chatHistory = [{role: "user", content: initialPrompt}];
     completedChatHTML = "";
     currentResponseMarkdown = "";
     resetTypewriter();
@@ -160,7 +160,8 @@ function startTypewriter() {
             updateContentUI(completedChatHTML + `<div class="bot-msg">${newChunkHTML}</div>`);
         } else if (currentResponseMarkdown !== "" && pendingText.length === 0) {
 
-            updateContentUI(completedChatHTML + `<div class="bot-msg">${currentResponseMarkdown }<div style="font-size: 11px; color: #888; margin-top: 2px;">Стоимость: ${cost}</div></div>`);
+            const newChunkHTML = await marked.parse(currentResponseMarkdown)
+            updateContentUI(completedChatHTML + `<div class="bot-msg">${newChunkHTML}<div style="font-size: 11px; color: #888; margin-top: 2px;">Стоимость: ${cost}</div></div>`);
 
             finalizeResponse();
         }
@@ -173,11 +174,14 @@ function finalizeResponse() {
     // Добавляем в историю для SDK
     // chatHistory.push({ role: 'model', parts: [{ text: currentResponseMarkdown }] });
     
-    chatHistory.push({role: "model", text: currentResponseMarkdown});
+    chatHistory.push({role: "assistant", content: currentResponseMarkdown});
     // Добавляем в завершенный HTML
 
     const finalHTML = marked.parse(currentResponseMarkdown);
     // Добавляем цену маленьким серым шрифтом после сообщения
+    console.log(currentResponseMarkdown);
+    console.log(finalHTML);
+
     completedChatHTML += `<div class="bot-msg">${finalHTML}<div style="font-size: 11px; color: #888; margin-top: 2px;">Стоимость: ${cost}</div></div>`;
     
     cost = 0;
@@ -191,7 +195,7 @@ async function sendUserMessage(text: string) {
 
     // 1. Добавляем вопрос в историю и в UI
     // chatHistory.push({ role: 'user', parts: [{ text: text }] });
-    chatHistory.push({ role: 'user', text: text});
+    chatHistory.push({ role: 'user', content: text});
 
     completedChatHTML += `<div class="user-msg"><b>Вы:</b> ${text}</div>`;
     updateContentUI(completedChatHTML + `<div class="bot-loading">Gemini печатает...</div>`);

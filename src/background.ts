@@ -14,17 +14,18 @@ chrome.runtime.onMessage.addListener(async (message, sender) => {
             const apiKey = storage.geminiApiKey;
             if (!apiKey || typeof apiKey != "string") return;
 
-            let text = "";
-            if (message.history) {
-                for (const s of message.history) {
-                    text += s;
-                }
-            }
-            console.log(text);
+            // let text = "";
+            // if (message.history) {
+            //     for (const s of message.history) {
+            //         text += s;
+            //     }
+            // }
+            // console.log(text);
 
             // Воссоздаем сессию чата с переданной историей
             console.log("start-chat")
             console.log(message.history || [])
+            console.log(message.history?.concat({role: "user", content: message.text}))
             console.log("send_message")
 
             const response = await fetch("https://api.gen-api.ru/api/v1/networks/gemini-2-5-flash-lite", {
@@ -34,15 +35,11 @@ chrome.runtime.onMessage.addListener(async (message, sender) => {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    messages: [
-                    {
-                        role: "user",
-                        content: message.text,
-                    }
-                    ],
+                    messages: message.history?.concat({role: "user", content: message.text}),
                     stream: true
                 })
             });
+            console.log("response received")
             if (response.body) {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
